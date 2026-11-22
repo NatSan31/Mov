@@ -106,67 +106,71 @@ class SubscriptionPlansScreen extends StatelessWidget {
                 ],
               ),
             ),
-
             const SizedBox(height: 24),
 
-            // Lista de los 3 Planes de Suscripción Obligatorios
+            // Lista de Planes con Diseño Responsivo sin Overflows
             ...subProvider.plans.map((plan) {
-              final isSelected = subProvider.selectedPlan.id == plan.id;
               final isUserCurrentTier = currentTier == plan.id;
               final price = subProvider.billingCycle == BillingCycle.monthly
                   ? plan.priceMonthly
-                  : (plan.priceYearly / 12);
+                  : (plan.priceYearly / 12.0);
 
               return Container(
                 margin: const EdgeInsets.only(bottom: 20),
                 decoration: BoxDecoration(
                   color: Theme.of(context).cardTheme.color ?? AppColors.darkCard,
-                  borderRadius: BorderRadius.circular(22),
+                  borderRadius: BorderRadius.circular(24),
                   border: Border.all(
-                    color: plan.isPopular
-                        ? AppColors.primary
-                        : isSelected
-                            ? AppColors.secondary
-                            : Colors.white12,
-                    width: plan.isPopular || isSelected ? 2 : 1,
+                    color: isUserCurrentTier
+                        ? AppColors.secondary
+                        : plan.isPopular
+                            ? AppColors.primary
+                            : Colors.white10,
+                    width: plan.isPopular || isUserCurrentTier ? 2 : 1,
                   ),
-                  boxShadow: plan.isPopular
-                      ? [
-                          BoxShadow(
-                            color: AppColors.primary.withOpacity(0.2),
-                            blurRadius: 16,
-                            offset: const Offset(0, 4),
-                          ),
-                        ]
-                      : null,
+                  boxShadow: [
+                    if (plan.isPopular)
+                      BoxShadow(
+                        color: AppColors.primary.withOpacity(0.18),
+                        blurRadius: 16,
+                        offset: const Offset(0, 6),
+                      ),
+                  ],
                 ),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     if (plan.isPopular)
                       Container(
+                        width: double.infinity,
                         padding: const EdgeInsets.symmetric(vertical: 6),
                         decoration: const BoxDecoration(
                           color: AppColors.primary,
-                          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
                         ),
                         child: const Text(
                           'MÁS POPULAR ENTRE ATLETAS',
                           textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 1),
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.2,
+                          ),
                         ),
                       ),
                     Padding(
-                      padding: const EdgeInsets.all(20),
+                      padding: const EdgeInsets.all(22),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                plan.name,
-                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                              Expanded(
+                                child: Text(
+                                  plan.name,
+                                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                                ),
                               ),
                               if (isUserCurrentTier)
                                 Container(
@@ -185,20 +189,29 @@ class SubscriptionPlansScreen extends StatelessWidget {
                           const SizedBox(height: 6),
                           Text(plan.tagline, style: const TextStyle(color: Colors.grey, fontSize: 12)),
                           const SizedBox(height: 16),
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.end,
+
+                          // Precio Adaptativo Responsivo con Wrap (Sin Overflow)
+                          Wrap(
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 8,
+                            runSpacing: 4,
                             children: [
                               Text(
                                 '\$${price.toStringAsFixed(2)}',
-                                style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Colors.white),
+                                style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w900, color: Colors.white),
                               ),
-                              const Text(' / mes', style: TextStyle(color: Colors.grey, fontSize: 14)),
+                              const Text(' / mes', style: TextStyle(color: Colors.grey, fontSize: 13)),
                               if (subProvider.billingCycle == BillingCycle.yearly)
-                                Padding(
-                                  padding: const EdgeInsets.only(left: 8, bottom: 4),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.secondary.withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: AppColors.secondary.withOpacity(0.3)),
+                                  ),
                                   child: Text(
-                                    '(Facturado \$${plan.priceYearly.toStringAsFixed(2)}/año)',
-                                    style: const TextStyle(color: AppColors.secondary, fontSize: 11),
+                                    'Facturado \$${plan.priceYearly.toStringAsFixed(2)}/año',
+                                    style: const TextStyle(color: AppColors.secondary, fontSize: 11, fontWeight: FontWeight.bold),
                                   ),
                                 ),
                             ],

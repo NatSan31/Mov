@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -184,33 +185,52 @@ class FirebaseService {
     });
   }
 
-  // --- FIREBASE STORAGE: SUBIDA DE FOTO DE PERFIL ---
+  // --- SUBIDA DE FOTO DE PERFIL (Storage nativo con Fallback a Firestore 100% gratuito) ---
   Future<String> uploadProfileImage(String uid, File imageFile) async {
-    if (_storage == null) {
-      throw Exception('Firebase Storage no inicializado');
+    String? downloadUrl;
+
+    // 1. Intento primario: Firebase Storage oficial
+    if (_storage != null) {
+      try {
+        final ref = _storage!.ref().child('profile_pictures').child('$uid.jpg');
+        final uploadTask = await ref.putFile(
+          imageFile,
+          SettableMetadata(contentType: 'image/jpeg'),
+        );
+        downloadUrl = await uploadTask.ref.getDownloadURL();
+        debugPrint('[FirebaseService] Foto subida exitosamente a Firebase Storage.');
+      } catch (storageError) {
+        debugPrint('[FirebaseService] Firebase Storage no disponible o requiere plan de pago ($storageError). Activando almacenamiento en Firestore...');
+      }
     }
 
+    // 2. Alternativa 100% Gratuita (Firestore Spark sin cobro): Codificación Base64
+    if (downloadUrl == null) {
+      try {
+        final bytes = await imageFile.readAsBytes();
+        final base64String = base64Encode(bytes);
+        downloadUrl = 'data:image/jpeg;base64,$base64String';
+        debugPrint('[FirebaseService] Foto de perfil convertida y almacenada en Firestore sin requerir Storage ni facturación.');
+      } catch (e) {
+        debugPrint('[FirebaseService] Error en codificación de imagen: $e');
+        rethrow;
+      }
+    }
+
+    // 3. Sincronizar en Firestore y Auth
     try {
-      final ref = _storage!.ref().child('profile_pictures').child('$uid.jpg');
-      final uploadTask = await ref.putFile(
-        imageFile,
-        SettableMetadata(contentType: 'image/jpeg'),
-      );
-      final downloadUrl = await uploadTask.ref.getDownloadURL();
-
-      // Sincronizar en Firebase Auth
-      await _auth?.currentUser?.updatePhotoURL(downloadUrl);
-
-      // Sincronizar en Firestore
       await _firestore?.collection(AppConstants.colUsers).doc(uid).update({
         'photoUrl': downloadUrl,
       });
 
-      return downloadUrl;
+      if (!downloadUrl.startsWith('data:image')) {
+        await _auth?.currentUser?.updatePhotoURL(downloadUrl);
+      }
     } catch (e) {
-      debugPrint('[FirebaseService] Error subiendo foto a Storage: $e');
-      rethrow;
+      debugPrint('[FirebaseService] Error actualizando foto en Firestore: $e');
     }
+
+    return downloadUrl;
   }
 
   // --- FIRESTORE: PRODUCTOS EN TIEMPO REAL ---
@@ -280,7 +300,6 @@ class FirebaseService {
           final list = snapshot.docs
               .map((doc) => OrderModel.fromMap(doc.data(), doc.id))
               .toList();
-          // Ordenamiento en memoria por fecha descendente (evita error de composite index)
           list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
           return list;
         });

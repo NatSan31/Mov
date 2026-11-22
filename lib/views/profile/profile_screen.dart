@@ -397,16 +397,11 @@ class ProfileScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(22),
                 child: Column(
                   children: [
-                    Image.network(
-                      imageUrl,
+                    CachedImageWrapper(
+                      imageUrl: imageUrl,
                       width: 280,
                       height: 280,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const SizedBox(
-                        width: 280,
-                        height: 280,
-                        child: Center(child: Icon(Icons.broken_image, size: 64, color: Colors.grey)),
-                      ),
                     ),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

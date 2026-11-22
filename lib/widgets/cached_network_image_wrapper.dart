@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../core/constants/app_colors.dart';
@@ -22,15 +24,25 @@ class CachedImageWrapper extends StatelessWidget {
   Widget build(BuildContext context) {
     Widget imageWidget;
 
-    if (imageUrl.isEmpty || !imageUrl.startsWith('http')) {
-      imageWidget = Container(
-        width: width,
-        height: height,
-        color: Colors.grey.shade800,
-        child: const Icon(Icons.fitness_center, color: Colors.white54, size: 36),
-      );
-    } else {
-      // Requerimiento: Persistencia y Caché de imágenes local para uso offline
+    // 1. Soporte para imágenes codificadas en Base64 (Almacenamiento gratuito en Firestore sin Storage)
+    if (imageUrl.startsWith('data:image')) {
+      try {
+        final commaIndex = imageUrl.indexOf(',');
+        final base64String = commaIndex != -1 ? imageUrl.substring(commaIndex + 1) : imageUrl;
+        final Uint8List bytes = base64Decode(base64String);
+
+        imageWidget = Image.memory(
+          bytes,
+          width: width,
+          height: height,
+          fit: fit,
+          errorBuilder: (_, __, ___) => _buildPlaceholder(),
+        );
+      } catch (e) {
+        imageWidget = _buildPlaceholder();
+      }
+    } else if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+      // 2. URLs de Firebase Storage o Unsplash con persistencia en caché local
       imageWidget = CachedNetworkImage(
         imageUrl: imageUrl,
         width: width,
@@ -42,19 +54,16 @@ class CachedImageWrapper extends StatelessWidget {
           color: Colors.grey.withOpacity(0.15),
           child: const Center(
             child: SizedBox(
-              width: 24,
-              height: 24,
+              width: 22,
+              height: 22,
               child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
             ),
           ),
         ),
-        errorWidget: (context, url, error) => Container(
-          width: width,
-          height: height,
-          color: Colors.grey.shade900,
-          child: const Icon(Icons.broken_image, color: Colors.white38),
-        ),
+        errorWidget: (context, url, error) => _buildPlaceholder(),
       );
+    } else {
+      imageWidget = _buildPlaceholder();
     }
 
     if (borderRadius != null) {
@@ -65,5 +74,14 @@ class CachedImageWrapper extends StatelessWidget {
     }
 
     return imageWidget;
+  }
+
+  Widget _buildPlaceholder() {
+    return Container(
+      width: width,
+      height: height,
+      color: Colors.grey.shade900,
+      child: const Icon(Icons.person, color: Colors.white54, size: 36),
+    );
   }
 }
