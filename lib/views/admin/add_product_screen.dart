@@ -88,7 +88,7 @@ class _AddProductContent extends StatelessWidget {
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('✅ Producto creado y guardado en Firestore con éxito'),
+              content: Text('✅ Producto publicado en el catálogo con éxito'),
               backgroundColor: AppColors.secondary,
             ),
           );
@@ -96,7 +96,7 @@ class _AddProductContent extends StatelessWidget {
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('❌ Error al guardar el producto en Firestore'),
+              content: Text('❌ Error al guardar el producto'),
               backgroundColor: AppColors.error,
             ),
           );
@@ -112,7 +112,7 @@ class _AddProductContent extends StatelessWidget {
             padding: const EdgeInsets.only(right: 12),
             child: Chip(
               label: Text(
-                isRealMode ? '🔥 Firebase' : '📱 Demo',
+                isRealMode ? 'En Línea' : 'Local',
                 style: const TextStyle(fontSize: 11),
               ),
               backgroundColor: isRealMode
@@ -212,7 +212,7 @@ class _AddProductContent extends StatelessWidget {
                         child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                       )
                     : const Icon(Icons.cloud_upload_outlined),
-                label: Text(formState.isSaving ? 'Guardando en Firestore...' : 'Guardar Producto en Firestore'),
+                label: Text(formState.isSaving ? 'Guardando...' : 'Publicar Producto'),
                 style: ElevatedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 52),
                 ),

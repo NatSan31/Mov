@@ -181,8 +181,8 @@ class ProfileScreen extends StatelessWidget {
                 children: [
                   ListTile(
                     leading: const Icon(Icons.notifications_active_outlined, color: AppColors.primaryLight),
-                    title: const Text('Canales de Notificaciones Push'),
-                    subtitle: const Text('Gestionar suscripciones FCM Topics'),
+                    title: const Text('Notificaciones y Alertas'),
+                    subtitle: const Text('Gestionar preferencias y avisos'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () {
                       Navigator.of(context).push(
@@ -205,7 +205,7 @@ class ProfileScreen extends StatelessWidget {
                   ListTile(
                     leading: const Icon(Icons.verified_user_outlined, color: AppColors.accent),
                     title: const Text('Verificación de Correo'),
-                    subtitle: Text(user?.emailVerified == true ? 'Cuenta Verificada en Firebase' : 'Pendiente'),
+                    subtitle: Text(user?.emailVerified == true ? 'Cuenta Verificada Oficial' : 'Pendiente'),
                     trailing: Icon(
                       user?.emailVerified == true ? Icons.check_circle : Icons.warning,
                       color: user?.emailVerified == true ? AppColors.secondary : AppColors.warning,
@@ -448,13 +448,13 @@ class ProfileScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const Text(
-                  'Actualizar Foto de Perfil (Firebase Storage)',
+                  'Actualizar Foto de Perfil',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 6),
                 const Text(
-                  'La imagen se guardará en la nube de Firebase y se sincronizará en todo tu panel.',
+                  'Elige una nueva foto para actualizar tu imagen de atleta.',
                   style: TextStyle(color: Colors.grey, fontSize: 12),
                   textAlign: TextAlign.center,
                 ),
@@ -478,7 +478,7 @@ class ProfileScreen extends StatelessWidget {
                         if (context.mounted && success) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('✅ Foto subida exitosamente a Firebase Storage y sincronizada'),
+                              content: Text('✅ Foto de perfil actualizada con éxito'),
                               backgroundColor: AppColors.secondary,
                             ),
                           );
@@ -513,7 +513,7 @@ class ProfileScreen extends StatelessWidget {
                         if (context.mounted && success) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('✅ Foto subida exitosamente a Firebase Storage y sincronizada'),
+                              content: Text('✅ Foto de perfil actualizada con éxito'),
                               backgroundColor: AppColors.secondary,
                             ),
                           );

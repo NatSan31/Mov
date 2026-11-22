@@ -7,6 +7,7 @@ import '../../core/services/biometric_service.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/subscription_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/notification_provider.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
 import 'order_success_screen.dart';
@@ -61,7 +62,7 @@ class CheckoutScreen extends StatelessWidget {
                     SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'Pasarela Encriptada de 256-bits. Certificado PCI-DSS Compliant.',
+                        'Pago encriptado de 256-bits. Transacción bancaria 100% segura.',
                         style: TextStyle(color: Colors.white70, fontSize: 11),
                       ),
                     ),
@@ -249,6 +250,10 @@ class CheckoutScreen extends StatelessWidget {
                         cardBrand: brandName,
                       );
                       if (success && context.mounted) {
+                        context.read<NotificationProvider>().triggerMockNotification(
+                          '⭐ ¡Membresía Activada!',
+                          'Tu plan ${subscription.selectedPlan.name} ya está disponible en tu perfil.',
+                        );
                         Navigator.of(context).pushReplacement(
                           MaterialPageRoute(
                             builder: (_) => OrderSuccessScreen(
@@ -267,6 +272,10 @@ class CheckoutScreen extends StatelessWidget {
                         cardBrand: brandName,
                       );
                       if (order != null && context.mounted) {
+                        context.read<NotificationProvider>().triggerMockNotification(
+                          '🎉 ¡Pedido Aprobado!',
+                          'Tu compra por \$${totalAmount.toStringAsFixed(2)} USD ha sido procesada con éxito.',
+                        );
                         Navigator.of(context).pushReplacement(
                           MaterialPageRoute(
                             builder: (_) => OrderSuccessScreen(

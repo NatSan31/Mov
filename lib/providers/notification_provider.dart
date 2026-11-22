@@ -103,6 +103,10 @@ class NotificationProvider extends ChangeNotifier {
 
     if (newState) {
       await _fcmService.subscribeToTopic(key);
+      triggerMockNotification(
+        '🔔 Canal Activado: ${topic.title}',
+        'Ahora recibirás alertas automáticas de esta sección directamente en tu dispositivo.',
+      );
     } else {
       await _fcmService.unsubscribeFromTopic(key);
     }
@@ -114,9 +118,12 @@ class NotificationProvider extends ChangeNotifier {
     } catch (_) {}
   }
 
-  /// Método de prueba para simular notificación en primer plano en emuladores
+  /// Método para enviar notificación visible tanto en el sistema (barra de notificaciones) como en app
   void triggerMockNotification(String title, String body) {
-    // Simulamos un RemoteMessage creando una notificación local visible
+    // 1. Mostrar notificación nativa en la bandeja del sistema Android
+    _fcmService.showNativeSystemNotification(title: title, body: body);
+
+    // 2. Mostrar banner interactivo in-app
     _latestForegroundNotification = RemoteMessage(
       notification: RemoteNotification(
         title: title,

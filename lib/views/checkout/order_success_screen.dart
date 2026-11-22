@@ -54,7 +54,7 @@ class OrderSuccessScreen extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 isSubscription
-                    ? 'Tu plan $subscriptionPlanName ha sido acreditado en tu membresía digital y registrado en Firebase.'
+                    ? 'Tu plan $subscriptionPlanName ha sido acreditado exitosamente en tu membresía digital.'
                     : 'Tu pedido ha sido procesado por la pasarela segura y transferido al centro de logística express.',
                 style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
                 textAlign: TextAlign.center,
@@ -193,8 +193,8 @@ class OrderSuccessScreen extends StatelessWidget {
                     const Divider(height: 16, color: Colors.white12),
                     _buildReceiptRow('Folio Transacción', orderId.substring(0, orderId.length.clamp(0, 16)).toUpperCase()),
                     _buildReceiptRow('Fecha & Hora', '${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year} - ${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')} hrs'),
-                    _buildReceiptRow('Plataforma', 'FitPulse App Mobile Pay (PCI-DSS)'),
-                    _buildReceiptRow('Estado en Firestore', 'Persistido en colección /orders'),
+                    _buildReceiptRow('Método de Pago', 'Pago Digital Seguro (256-bit SSL)'),
+                    _buildReceiptRow('Estado del Pedido', 'Confirmado y en preparación'),
                     const Divider(height: 16, color: Colors.white12),
                     _buildReceiptRow('Subtotal', '\$${(amount * 0.862).toStringAsFixed(2)} USD'),
                     _buildReceiptRow('Impuestos (IVA 16%)', '\$${(amount * 0.138).toStringAsFixed(2)} USD'),

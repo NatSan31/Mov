@@ -66,10 +66,10 @@ class HomeDashboardScreen extends StatelessWidget {
               );
             },
           ),
-          // Botón para simular Push Notification inmediata
+          // Botón para enviar alerta de prueba inmediata
           IconButton(
             icon: const Icon(Icons.send_to_mobile, color: AppColors.secondary),
-            tooltip: 'Simular Notificación Push (FCM)',
+            tooltip: 'Enviar Alerta de Prueba',
             onPressed: () {
               context.read<NotificationProvider>().triggerMockNotification(
                     '¡Flash Sale en FitPulse Pro Shop!',

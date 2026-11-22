@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import '../constants/app_constants.dart';
@@ -16,6 +17,8 @@ class FCMService {
   static final FCMService _instance = FCMService._internal();
   factory FCMService() => _instance;
   FCMService._internal();
+
+  static const MethodChannel _nativeChannel = MethodChannel('com.fitpulse.fitpulse_app/notifications');
 
   FirebaseMessaging? _messaging;
 
@@ -74,6 +77,11 @@ class FCMService {
       // 5. ESTADO FOREGROUND
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
         _foregroundMessageStreamController.add(message);
+        final title = message.notification?.title ?? 'FitPulse Club';
+        final body = message.notification?.body ?? '';
+        if (body.isNotEmpty) {
+          showNativeSystemNotification(title: title, body: body);
+        }
       });
 
       // 6. ESTADO BACKGROUND
@@ -116,6 +124,17 @@ class FCMService {
       debugPrint('[FCM] Error cancelando suscripción: $e');
     }
     return false;
+  }
+
+  Future<void> showNativeSystemNotification({required String title, required String body}) async {
+    try {
+      await _nativeChannel.invokeMethod('showLocalNotification', {
+        'title': title,
+        'body': body,
+      });
+    } catch (e) {
+      debugPrint('[FCMService] Notificación nativa omitida o no soportada: $e');
+    }
   }
 
   void dispose() {
