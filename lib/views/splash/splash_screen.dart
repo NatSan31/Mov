@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import '../../core/constants/app_colors.dart';
+import '../../core/services/firebase_service.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/onboarding_provider.dart';
 import '../onboarding/onboarding_screen.dart';
@@ -13,16 +15,17 @@ class SplashScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Escuchar el estado de autenticación y onboarding de manera segura
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       try {
         final onboardingProvider = context.read<OnboardingProvider>();
         await onboardingProvider.checkOnboardingStatus();
 
-        await Future.delayed(const Duration(milliseconds: 1500));
+        // Breve pausa para apreciación de branding
+        await Future.delayed(const Duration(milliseconds: 1400));
 
         if (!context.mounted) return;
 
+        // 1. Si no ha visto el onboarding por primera vez
         if (!onboardingProvider.isCompleted) {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (_) => const OnboardingScreen()),
@@ -30,22 +33,48 @@ class SplashScreen extends StatelessWidget {
           return;
         }
 
-        final authProvider = context.read<AuthProvider>();
-        if (authProvider.status == AuthStatus.authenticated) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
-          );
-        } else if (authProvider.status == AuthStatus.unverifiedEmail) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const EmailVerificationScreen()),
-          );
-        } else {
+        // 2. Persistencia de Sesión Real (Auto-Login / Recordarme de Firebase)
+        final currentUser = FirebaseAuth.instance.currentUser;
+        if (currentUser != null) {
+          try {
+            await currentUser.reload();
+          } catch (_) {}
+
+          final isSocial = currentUser.providerData.any((p) => p.providerId != 'password');
+          final isVerified = currentUser.emailVerified || isSocial;
+
+          if (isVerified) {
+            // Sincronizar perfil en el Provider
+            final authProvider = context.read<AuthProvider>();
+            final profile = await FirebaseService().getUserProfile(currentUser.uid);
+            if (profile != null) {
+              authProvider.clearMessages();
+            }
+
+            if (context.mounted) {
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
+              );
+              return;
+            }
+          } else {
+            if (context.mounted) {
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (_) => const EmailVerificationScreen()),
+              );
+              return;
+            }
+          }
+        }
+
+        // 3. Si no hay sesión activa, ir al login
+        if (context.mounted) {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (_) => const LoginScreen()),
           );
         }
       } catch (e) {
-        debugPrint('[SplashScreen] Error durante navegación: $e');
+        debugPrint('[SplashScreen] Navegación de contingencia: $e');
         if (context.mounted) {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (_) => const LoginScreen()),

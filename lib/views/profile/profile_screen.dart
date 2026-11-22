@@ -36,42 +36,52 @@ class ProfileScreen extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
         child: Column(
           children: [
-            // Avatar con indicador de proveedor y botón de edición restringido
+            // Avatar con indicador de proveedor, vista previa en grande y botón de edición
             Center(
               child: Stack(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: user?.subscriptionTier == 'black_vip'
-                            ? AppColors.accent
-                            : AppColors.primary,
-                        width: 3,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.primary.withOpacity(0.3),
-                          blurRadius: 16,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: authProvider.isLoading
-                        ? const SizedBox(
-                            width: 104,
-                            height: 104,
-                            child: Center(
-                              child: CircularProgressIndicator(color: AppColors.primary),
-                            ),
-                          )
-                        : CachedImageWrapper(
-                            imageUrl: user?.photoUrl ?? '',
-                            width: 104,
-                            height: 104,
-                            borderRadius: BorderRadius.circular(52),
+                  GestureDetector(
+                    onTap: () {
+                      if (user?.photoUrl != null && user!.photoUrl.isNotEmpty) {
+                        _showLargePhotoDialog(context, user.photoUrl, user.displayName);
+                      }
+                    },
+                    child: Tooltip(
+                      message: 'Toca para previsualizar en grande',
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: user?.subscriptionTier == 'black_vip'
+                                ? AppColors.accent
+                                : AppColors.primary,
+                            width: 3.5,
                           ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.withOpacity(0.35),
+                              blurRadius: 18,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: authProvider.isLoading
+                            ? const SizedBox(
+                                width: 106,
+                                height: 106,
+                                child: Center(
+                                  child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 3),
+                                ),
+                              )
+                            : CachedImageWrapper(
+                                imageUrl: user?.photoUrl ?? '',
+                                width: 106,
+                                height: 106,
+                                borderRadius: BorderRadius.circular(53),
+                              ),
+                      ),
+                    ),
                   ),
 
                   // Botón de cámara / editar foto
@@ -84,7 +94,7 @@ class ProfileScreen extends StatelessWidget {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text(
-                                'Restricción de evaluación: Las cuentas con Google o GitHub gestionan su foto desde la plataforma original.',
+                                'Restricción de evaluación: Las cuentas vinculadas con Google o GitHub gestionan su foto desde la plataforma original.',
                               ),
                               backgroundColor: AppColors.warning,
                               duration: Duration(seconds: 4),
@@ -95,11 +105,17 @@ class ProfileScreen extends StatelessWidget {
                         }
                       },
                       child: Container(
-                        padding: const EdgeInsets.all(8),
+                        padding: const EdgeInsets.all(9),
                         decoration: BoxDecoration(
-                          color: isEmailAccount ? AppColors.primary : Colors.grey,
+                          color: isEmailAccount ? AppColors.primary : Colors.grey.shade700,
                           shape: BoxShape.circle,
                           border: Border.all(color: Colors.white, width: 2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.4),
+                              blurRadius: 6,
+                            ),
+                          ],
                         ),
                         child: Icon(
                           isEmailAccount ? Icons.camera_alt : Icons.lock,
@@ -113,7 +129,7 @@ class ProfileScreen extends StatelessWidget {
               ),
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
 
             // Nombre y correo
             Text(
@@ -147,7 +163,7 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ),
               child: Text(
-                'Autenticado con: ${user?.authProvider.toUpperCase() ?? "EMAIL"}',
+                'Proveedor: ${user?.authProvider.toUpperCase() ?? "EMAIL"}',
                 style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
               ),
             ),
@@ -261,7 +277,7 @@ class ProfileScreen extends StatelessWidget {
                 return ListView.separated(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount: orders.length.clamp(0, 5),
+                  itemCount: orders.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 10),
                   itemBuilder: (context, idx) {
                     final order = orders[idx];
@@ -270,7 +286,7 @@ class ProfileScreen extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: Theme.of(context).cardTheme.color ?? AppColors.darkCard,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppColors.secondary.withOpacity(0.3)),
+                        border: Border.all(color: AppColors.secondary.withOpacity(0.35)),
                       ),
                       child: Row(
                         children: [
@@ -293,7 +309,7 @@ class ProfileScreen extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  '${order.items.length} artículos • Pagado con ${order.paymentCardBrand} •••• ${order.paymentLast4}',
+                                  '${order.items.length} artículos • ${order.paymentCardBrand} •••• ${order.paymentLast4}',
                                   style: const TextStyle(color: Colors.grey, fontSize: 11),
                                 ),
                                 const SizedBox(height: 4),
@@ -355,6 +371,72 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
+  /// Muestra la imagen en grande con diálogo modal
+  void _showLargePhotoDialog(BuildContext context, String imageUrl, String name) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                color: AppColors.darkSurface,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: AppColors.primary, width: 2),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.8),
+                    blurRadius: 24,
+                    spreadRadius: 4,
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(22),
+                child: Column(
+                  children: [
+                    Image.network(
+                      imageUrl,
+                      width: 280,
+                      height: 280,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const SizedBox(
+                        width: 280,
+                        height: 280,
+                        child: Center(child: Icon(Icons.broken_image, size: 64, color: Colors.grey)),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              name,
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close, color: Colors.white70),
+                            onPressed: () => Navigator.of(ctx).pop(),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showPhotoPickerSheet(BuildContext context, AuthProvider authProvider) {
     final picker = ImagePicker();
 
@@ -397,11 +479,11 @@ class ProfileScreen extends StatelessWidget {
                       );
                       if (photo != null) {
                         final file = File(photo.path);
-                        await authProvider.updateProfilePhoto(file);
-                        if (context.mounted) {
+                        final success = await authProvider.updateProfilePhoto(file);
+                        if (context.mounted && success) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('✅ Foto subida exitosamente a Firebase Storage'),
+                              content: Text('✅ Foto subida exitosamente a Firebase Storage y sincronizada'),
                               backgroundColor: AppColors.secondary,
                             ),
                           );
@@ -410,7 +492,7 @@ class ProfileScreen extends StatelessWidget {
                     } catch (e) {
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Error al capturar foto: $e'), backgroundColor: AppColors.error),
+                          SnackBar(content: Text('Error al subir foto: $e'), backgroundColor: AppColors.error),
                         );
                       }
                     }
@@ -432,11 +514,11 @@ class ProfileScreen extends StatelessWidget {
                       );
                       if (image != null) {
                         final file = File(image.path);
-                        await authProvider.updateProfilePhoto(file);
-                        if (context.mounted) {
+                        final success = await authProvider.updateProfilePhoto(file);
+                        if (context.mounted && success) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('✅ Foto subida exitosamente a Firebase Storage'),
+                              content: Text('✅ Foto subida exitosamente a Firebase Storage y sincronizada'),
                               backgroundColor: AppColors.secondary,
                             ),
                           );
@@ -445,7 +527,7 @@ class ProfileScreen extends StatelessWidget {
                     } catch (e) {
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Error al seleccionar imagen: $e'), backgroundColor: AppColors.error),
+                          SnackBar(content: Text('Error al subir foto: $e'), backgroundColor: AppColors.error),
                         );
                       }
                     }

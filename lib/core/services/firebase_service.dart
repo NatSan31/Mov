@@ -136,28 +136,6 @@ class FirebaseService {
             stock: 60,
             isFeatured: true,
           ),
-          ProductModel(
-            id: 'prod_7',
-            name: 'BCAA 2:1:1 Recovery Complex (400g)',
-            description: 'Aminoácidos de cadena ramificada en proporción óptima para recuperación muscular post-entrenamiento. Sabor Sandía.',
-            price: 27.99,
-            category: 'Suplementos',
-            imageUrl: 'https://images.unsplash.com/photo-1543362906-acfc16c67564?auto=format&fit=crop&w=600&q=80',
-            rating: 4.7,
-            stock: 45,
-            isFeatured: false,
-          ),
-          ProductModel(
-            id: 'prod_8',
-            name: 'Mancuernas Ajustables Premium 5-25kg',
-            description: 'Sistema de mancuernas ajustables de hierro fundido que reemplaza 9 pares tradicionales. Mecanismo de selección de peso rápido.',
-            price: 149.99,
-            category: 'Equipamiento',
-            imageUrl: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=600&q=80',
-            rating: 4.9,
-            stock: 10,
-            isFeatured: true,
-          ),
         ];
 
         for (final p in sampleProducts) {
@@ -209,7 +187,7 @@ class FirebaseService {
   // --- FIREBASE STORAGE: SUBIDA DE FOTO DE PERFIL ---
   Future<String> uploadProfileImage(String uid, File imageFile) async {
     if (_storage == null) {
-      return 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80';
+      throw Exception('Firebase Storage no inicializado');
     }
 
     try {
@@ -220,7 +198,10 @@ class FirebaseService {
       );
       final downloadUrl = await uploadTask.ref.getDownloadURL();
 
+      // Sincronizar en Firebase Auth
       await _auth?.currentUser?.updatePhotoURL(downloadUrl);
+
+      // Sincronizar en Firestore
       await _firestore?.collection(AppConstants.colUsers).doc(uid).update({
         'photoUrl': downloadUrl,
       });
@@ -228,7 +209,7 @@ class FirebaseService {
       return downloadUrl;
     } catch (e) {
       debugPrint('[FirebaseService] Error subiendo foto a Storage: $e');
-      return 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80';
+      rethrow;
     }
   }
 
@@ -281,20 +262,27 @@ class FirebaseService {
     if (_firestore == null) return;
     try {
       await _firestore!.collection(AppConstants.colOrders).doc(order.id).set(order.toMap());
+      debugPrint('[FirebaseService] Orden guardada en Firestore: ${order.id}');
     } catch (e) {
       debugPrint('[FirebaseService] Error guardando orden en Firestore: $e');
       rethrow;
     }
   }
 
+  /// Consulta las órdenes del usuario en Firestore sin requerir índice compuesto
   Stream<List<OrderModel>> streamUserOrders(String userId) {
-    if (_firestore == null) return const Stream.empty();
+    if (_firestore == null || userId.isEmpty) return const Stream.empty();
     return _firestore!
         .collection(AppConstants.colOrders)
         .where('userId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snapshot) =>
-            snapshot.docs.map((doc) => OrderModel.fromMap(doc.data(), doc.id)).toList());
+        .map((snapshot) {
+          final list = snapshot.docs
+              .map((doc) => OrderModel.fromMap(doc.data(), doc.id))
+              .toList();
+          // Ordenamiento en memoria por fecha descendente (evita error de composite index)
+          list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          return list;
+        });
   }
 }
