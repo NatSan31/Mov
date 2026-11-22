@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../models/user_model.dart';
 import '../core/services/firebase_service.dart';
+import '../core/constants/app_constants.dart';
 
 enum AuthStatus { uninitialized, authenticated, unauthenticated, unverifiedEmail, authenticating }
 
@@ -31,13 +32,14 @@ class AuthProvider extends ChangeNotifier {
   }
 
   void _initAuthListener() {
-    if (_firebaseService.isInitialized && _firebaseService.hasRealCredentials && _firebaseService.auth != null) {
+    if (_firebaseService.auth != null) {
       _firebaseService.auth!.authStateChanges().listen((User? firebaseUser) async {
         if (firebaseUser == null) {
           _status = AuthStatus.unauthenticated;
           _currentUser = null;
           notifyListeners();
         } else {
+          // Las cuentas de Google o GitHub se consideran verificadas por su propio proveedor OAuth
           final isSocial = firebaseUser.providerData.any((p) => p.providerId != 'password');
           final isVerified = firebaseUser.emailVerified || isSocial;
 
@@ -46,6 +48,7 @@ class AuthProvider extends ChangeNotifier {
             _currentUser = _mapFirebaseUser(firebaseUser);
             notifyListeners();
           } else {
+            // Sincronizar datos reales desde Firestore
             final profile = await _firebaseService.getUserProfile(firebaseUser.uid);
             _currentUser = profile ?? _mapFirebaseUser(firebaseUser);
             _status = AuthStatus.authenticated;
@@ -82,7 +85,7 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // --- 1. REGISTRO CON CORREO Y CONTRASEÑA ---
+  // --- 1. REGISTRO REAL CON CORREO Y CONTRASEÑA ---
   Future<bool> registerWithEmail(String email, String password, String name) async {
     _isLoading = true;
     _errorMessage = null;
@@ -90,17 +93,24 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      if (_firebaseService.isInitialized && _firebaseService.hasRealCredentials && _firebaseService.auth != null) {
-        final credential = await _firebaseService.auth!.createUserWithEmailAndPassword(
-          email: email.trim(),
-          password: password,
-        );
+      if (_firebaseService.auth == null) {
+        throw Exception('Servicio de Firebase no disponible.');
+      }
 
-        await credential.user?.updateDisplayName(name.trim());
-        await credential.user?.sendEmailVerification();
+      final credential = await _firebaseService.auth!.createUserWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+
+      final user = credential.user;
+      if (user != null) {
+        await user.updateDisplayName(name.trim());
+
+        // Enviar correo de verificación real a través de Firebase Auth
+        await user.sendEmailVerification();
 
         final newUser = UserModel(
-          uid: credential.user!.uid,
+          uid: user.uid,
           email: email.trim(),
           displayName: name.trim(),
           photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
@@ -109,70 +119,31 @@ class AuthProvider extends ChangeNotifier {
           memberSince: DateTime.now(),
         );
 
+        // Guardar documento real del usuario en Firestore
         await _firebaseService.saveUserProfile(newUser);
+
         _currentUser = newUser;
         _status = AuthStatus.unverifiedEmail;
-        _successMessage = 'Te hemos enviado un correo de verificación a ${email.trim()}.';
-      } else {
-        // Modo Local / Simulación interactiva (cuando no hay backend o google-services.json aún)
-        _currentUser = UserModel(
-          uid: 'user_${DateTime.now().millisecondsSinceEpoch}',
-          email: email.trim(),
-          displayName: name.trim().isNotEmpty ? name.trim() : 'Emilio Malagón Ortiz',
-          photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-          authProvider: 'password',
-          emailVerified: false,
-          memberSince: DateTime.now(),
-        );
-        _status = AuthStatus.unverifiedEmail;
-        _successMessage = 'Cuenta creada. Hemos enviado el enlace de validación a ${email.trim()}.';
+        _successMessage = 'Te hemos enviado un correo de verificación a ${email.trim()}. Por favor abre tu correo y confirma tu cuenta antes de acceder.';
       }
 
       _isLoading = false;
       notifyListeners();
       return true;
     } on FirebaseAuthException catch (e) {
-      if (!_firebaseService.hasRealCredentials) {
-        // En ausencia de credenciales reales de Google, procesar en modo local
-        _currentUser = UserModel(
-          uid: 'user_${DateTime.now().millisecondsSinceEpoch}',
-          email: email.trim(),
-          displayName: name.trim().isNotEmpty ? name.trim() : 'Emilio Malagón Ortiz',
-          photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-          authProvider: 'password',
-          emailVerified: false,
-          memberSince: DateTime.now(),
-        );
-        _status = AuthStatus.unverifiedEmail;
-        _successMessage = 'Cuenta registrada. Por favor confirma tu correo para continuar.';
-        _isLoading = false;
-        notifyListeners();
-        return true;
-      }
       _isLoading = false;
       _errorMessage = _getAuthErrorMessage(e.code);
       notifyListeners();
       return false;
     } catch (e) {
-      // Fallback local seguro
-      _currentUser = UserModel(
-        uid: 'user_${DateTime.now().millisecondsSinceEpoch}',
-        email: email.trim(),
-        displayName: name.trim().isNotEmpty ? name.trim() : 'Emilio Malagón Ortiz',
-        photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-        authProvider: 'password',
-        emailVerified: false,
-        memberSince: DateTime.now(),
-      );
-      _status = AuthStatus.unverifiedEmail;
-      _successMessage = 'Cuenta registrada. Revisa tu correo de confirmación.';
       _isLoading = false;
+      _errorMessage = 'Error al registrar la cuenta: $e';
       notifyListeners();
-      return true;
+      return false;
     }
   }
 
-  // --- 2. INICIO DE SESIÓN CON CORREO Y CONTRASEÑA ---
+  // --- 2. INICIO DE SESIÓN REAL CON CORREO Y CONTRASEÑA ---
   Future<bool> loginWithEmail(String email, String password) async {
     _isLoading = true;
     _errorMessage = null;
@@ -180,62 +151,36 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      if (_firebaseService.isInitialized && _firebaseService.hasRealCredentials && _firebaseService.auth != null) {
-        final credential = await _firebaseService.auth!.signInWithEmailAndPassword(
-          email: email.trim(),
-          password: password,
-        );
-
-        await credential.user?.reload();
-        final user = _firebaseService.auth!.currentUser;
-
-        if (user != null && !user.emailVerified) {
-          _status = AuthStatus.unverifiedEmail;
-          _currentUser = _mapFirebaseUser(user);
-          _errorMessage = 'Tu cuenta aún no está verificada. Revisa tu correo electrónico.';
-          _isLoading = false;
-          notifyListeners();
-          return false;
-        }
-
-        final profile = await _firebaseService.getUserProfile(credential.user!.uid);
-        _currentUser = profile ?? _mapFirebaseUser(credential.user!);
-        _status = AuthStatus.authenticated;
-      } else {
-        // Modo Local / Simulación fluida
-        _currentUser = UserModel(
-          uid: 'user_${email.hashCode}',
-          email: email.trim(),
-          displayName: _currentUser?.displayName ?? (email.split('@').first),
-          photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-          authProvider: 'password',
-          emailVerified: true,
-          subscriptionTier: 'pro',
-          memberSince: DateTime.now().subtract(const Duration(days: 30)),
-        );
-        _status = AuthStatus.authenticated;
+      if (_firebaseService.auth == null) {
+        throw Exception('Servicio de Firebase no disponible.');
       }
+
+      final credential = await _firebaseService.auth!.signInWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+
+      // Recargar datos desde los servidores de Google para verificar si ya confirmó el correo
+      await credential.user?.reload();
+      final user = _firebaseService.auth!.currentUser;
+
+      if (user != null && !user.emailVerified) {
+        _status = AuthStatus.unverifiedEmail;
+        _currentUser = _mapFirebaseUser(user);
+        _errorMessage = 'Tu cuenta aún no está verificada. Revisa tu correo electrónico para confirmar tu identidad.';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
+      final profile = await _firebaseService.getUserProfile(credential.user!.uid);
+      _currentUser = profile ?? _mapFirebaseUser(credential.user!);
+      _status = AuthStatus.authenticated;
 
       _isLoading = false;
       notifyListeners();
       return true;
     } on FirebaseAuthException catch (e) {
-      if (!_firebaseService.hasRealCredentials) {
-        _currentUser = UserModel(
-          uid: 'user_${email.hashCode}',
-          email: email.trim(),
-          displayName: email.split('@').first,
-          photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-          authProvider: 'password',
-          emailVerified: true,
-          subscriptionTier: 'pro',
-          memberSince: DateTime.now().subtract(const Duration(days: 30)),
-        );
-        _status = AuthStatus.authenticated;
-        _isLoading = false;
-        notifyListeners();
-        return true;
-      }
       _isLoading = false;
       _errorMessage = _getAuthErrorMessage(e.code);
       notifyListeners();
@@ -255,73 +200,50 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      if (_firebaseService.isInitialized && _firebaseService.hasRealCredentials && _firebaseService.auth != null) {
-        final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-        if (googleUser == null) {
-          _isLoading = false;
-          notifyListeners();
-          return false;
-        }
-
-        final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-        final AuthCredential credential = GoogleAuthProvider.credential(
-          accessToken: googleAuth.accessToken,
-          idToken: googleAuth.idToken,
-        );
-
-        final userCredential = await _firebaseService.auth!.signInWithCredential(credential);
-        final firebaseUser = userCredential.user!;
-
-        UserModel? existingUser = await _firebaseService.getUserProfile(firebaseUser.uid);
-        if (existingUser == null) {
-          existingUser = UserModel(
-            uid: firebaseUser.uid,
-            email: firebaseUser.email ?? '',
-            displayName: firebaseUser.displayName ?? 'Emilio Malagón Ortiz',
-            photoUrl: firebaseUser.photoURL ?? 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=400&q=80',
-            authProvider: 'google.com',
-            emailVerified: true,
-            memberSince: DateTime.now(),
-          );
-          await _firebaseService.saveUserProfile(existingUser);
-        }
-
-        _currentUser = existingUser;
-        _status = AuthStatus.authenticated;
-      } else {
-        // Simulación interactiva de Google Sign-in
-        _currentUser = UserModel(
-          uid: 'google_user_${DateTime.now().millisecondsSinceEpoch}',
-          email: 'emilio.malagon.google@fitpulse.club',
-          displayName: 'Emilio Malagón (Google)',
-          photoUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=400&q=80',
-          authProvider: 'google.com',
-          emailVerified: true,
-          subscriptionTier: 'black_vip',
-          memberSince: DateTime.now().subtract(const Duration(days: 60)),
-        );
-        _status = AuthStatus.authenticated;
+      if (_firebaseService.auth == null) {
+        throw Exception('Servicio de Firebase no disponible.');
       }
 
-      _isLoading = false;
-      notifyListeners();
-      return true;
-    } catch (e) {
-      // Fallback seguro ante falta de huella SHA-1 o configuración
-      _currentUser = UserModel(
-        uid: 'google_user_${DateTime.now().millisecondsSinceEpoch}',
-        email: 'emilio.malagon.google@fitpulse.club',
-        displayName: 'Emilio Malagón (Google)',
-        photoUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=400&q=80',
-        authProvider: 'google.com',
-        emailVerified: true,
-        subscriptionTier: 'black_vip',
-        memberSince: DateTime.now().subtract(const Duration(days: 60)),
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final AuthCredential credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
       );
+
+      final userCredential = await _firebaseService.auth!.signInWithCredential(credential);
+      final firebaseUser = userCredential.user!;
+
+      UserModel? existingUser = await _firebaseService.getUserProfile(firebaseUser.uid);
+      if (existingUser == null) {
+        existingUser = UserModel(
+          uid: firebaseUser.uid,
+          email: firebaseUser.email ?? '',
+          displayName: firebaseUser.displayName ?? 'Usuario Google',
+          photoUrl: firebaseUser.photoURL ?? 'https://lh3.googleusercontent.com/a/default-user',
+          authProvider: 'google.com',
+          emailVerified: true,
+          memberSince: DateTime.now(),
+        );
+        await _firebaseService.saveUserProfile(existingUser);
+      }
+
+      _currentUser = existingUser;
       _status = AuthStatus.authenticated;
       _isLoading = false;
       notifyListeners();
       return true;
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = 'Error al iniciar sesión con Google: $e';
+      notifyListeners();
+      return false;
     }
   }
 
@@ -331,64 +253,42 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      if (_firebaseService.isInitialized && _firebaseService.hasRealCredentials && _firebaseService.auth != null) {
-        final GithubAuthProvider githubProvider = GithubAuthProvider();
-        final userCredential = await _firebaseService.auth!.signInWithProvider(githubProvider);
-        final firebaseUser = userCredential.user!;
-
-        UserModel? existingUser = await _firebaseService.getUserProfile(firebaseUser.uid);
-        if (existingUser == null) {
-          existingUser = UserModel(
-            uid: firebaseUser.uid,
-            email: firebaseUser.email ?? '',
-            displayName: firebaseUser.displayName ?? 'Emilio Malagón (GitHub)',
-            photoUrl: firebaseUser.photoURL ?? 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=400&q=80',
-            authProvider: 'github.com',
-            emailVerified: true,
-            memberSince: DateTime.now(),
-          );
-          await _firebaseService.saveUserProfile(existingUser);
-        }
-
-        _currentUser = existingUser;
-        _status = AuthStatus.authenticated;
-      } else {
-        // Simulación GitHub Sign-in
-        _currentUser = UserModel(
-          uid: 'github_user_${DateTime.now().millisecondsSinceEpoch}',
-          email: 'emilio.github@fitpulse.club',
-          displayName: 'Emilio Malagón (GitHub Dev)',
-          photoUrl: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=400&q=80',
-          authProvider: 'github.com',
-          emailVerified: true,
-          subscriptionTier: 'pro',
-          memberSince: DateTime.now(),
-        );
-        _status = AuthStatus.authenticated;
+      if (_firebaseService.auth == null) {
+        throw Exception('Servicio de Firebase no disponible.');
       }
 
-      _isLoading = false;
-      notifyListeners();
-      return true;
-    } catch (e) {
-      _currentUser = UserModel(
-        uid: 'github_user_${DateTime.now().millisecondsSinceEpoch}',
-        email: 'emilio.github@fitpulse.club',
-        displayName: 'Emilio Malagón (GitHub Dev)',
-        photoUrl: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=400&q=80',
-        authProvider: 'github.com',
-        emailVerified: true,
-        subscriptionTier: 'pro',
-        memberSince: DateTime.now(),
-      );
+      final GithubAuthProvider githubProvider = GithubAuthProvider();
+      final userCredential = await _firebaseService.auth!.signInWithProvider(githubProvider);
+      final firebaseUser = userCredential.user!;
+
+      UserModel? existingUser = await _firebaseService.getUserProfile(firebaseUser.uid);
+      if (existingUser == null) {
+        existingUser = UserModel(
+          uid: firebaseUser.uid,
+          email: firebaseUser.email ?? '',
+          displayName: firebaseUser.displayName ?? 'Usuario GitHub',
+          photoUrl: firebaseUser.photoURL ?? 'https://github.com/identicons/user.png',
+          authProvider: 'github.com',
+          emailVerified: true,
+          memberSince: DateTime.now(),
+        );
+        await _firebaseService.saveUserProfile(existingUser);
+      }
+
+      _currentUser = existingUser;
       _status = AuthStatus.authenticated;
       _isLoading = false;
       notifyListeners();
       return true;
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = 'Error al iniciar sesión con GitHub: $e';
+      notifyListeners();
+      return false;
     }
   }
 
-  // --- 4. REENVÍO DE CORREO DE CONFIRMACIÓN ---
+  // --- 4. REENVÍO DE CORREO DE CONFIRMACIÓN REAL ---
   Future<bool> resendEmailVerification() async {
     _isLoading = true;
     _errorMessage = null;
@@ -396,65 +296,65 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      if (_firebaseService.isInitialized && _firebaseService.hasRealCredentials && _firebaseService.auth != null) {
-        final user = _firebaseService.auth!.currentUser;
-        if (user != null && !user.emailVerified) {
-          await user.sendEmailVerification();
-          _successMessage = 'Se ha reenviado el correo de confirmación exitosamente.';
-        }
+      final user = _firebaseService.auth?.currentUser;
+      if (user != null && !user.emailVerified) {
+        await user.sendEmailVerification();
+        _successMessage = 'Se ha reenviado el correo de confirmación a ${user.email}. Por favor revisa tu bandeja o spam.';
       } else {
-        _successMessage = 'Correo de verificación reenviado a ${_currentUser?.email ?? "tu cuenta"}.';
+        _errorMessage = 'No se encontró un usuario pendiente de verificación.';
       }
       _isLoading = false;
       notifyListeners();
       return true;
     } catch (e) {
-      _successMessage = 'Correo de verificación reenviado exitosamente.';
       _isLoading = false;
+      _errorMessage = 'No se pudo reenviar el correo: $e';
       notifyListeners();
-      return true;
+      return false;
     }
   }
 
-  // --- 5. COMPROBAR VERIFICACIÓN DE CORREO ---
+  // --- 5. COMPROBAR VERIFICACIÓN DE CORREO ESTRICTA ---
   Future<bool> checkEmailVerified() async {
     _isLoading = true;
+    _errorMessage = null;
     notifyListeners();
 
     try {
-      if (_firebaseService.isInitialized && _firebaseService.hasRealCredentials && _firebaseService.auth != null) {
-        await _firebaseService.auth!.currentUser?.reload();
-        final user = _firebaseService.auth!.currentUser;
-        if (user != null && user.emailVerified) {
-          final profile = await _firebaseService.getUserProfile(user.uid);
-          _currentUser = profile ?? _mapFirebaseUser(user);
+      final user = _firebaseService.auth?.currentUser;
+      if (user != null) {
+        // Consultar directamente a los servidores de Firebase
+        await user.reload();
+        final updatedUser = _firebaseService.auth?.currentUser;
+
+        if (updatedUser != null && updatedUser.emailVerified) {
+          // Marcar como verificado en Firestore
+          await _firebaseService.firestore
+              ?.collection(AppConstants.colUsers)
+              .doc(updatedUser.uid)
+              .update({'emailVerified': true});
+
+          final profile = await _firebaseService.getUserProfile(updatedUser.uid);
+          _currentUser = profile ?? _mapFirebaseUser(updatedUser);
           _status = AuthStatus.authenticated;
           _isLoading = false;
           notifyListeners();
           return true;
-        }
-      } else {
-        // En modo local, simular confirmación exitosa
-        if (_currentUser != null) {
-          _currentUser = _currentUser!.copyWith(emailVerified: true);
-          _status = AuthStatus.authenticated;
+        } else {
+          _errorMessage = 'Tu correo aún no ha sido confirmado. Abre el correo que te envió Firebase y haz clic en el enlace de verificación antes de continuar.';
           _isLoading = false;
           notifyListeners();
-          return true;
+          return false;
         }
       }
+
       _isLoading = false;
+      _errorMessage = 'No hay sesión de usuario activa.';
       notifyListeners();
       return false;
     } catch (e) {
-      if (_currentUser != null) {
-        _currentUser = _currentUser!.copyWith(emailVerified: true);
-        _status = AuthStatus.authenticated;
-        _isLoading = false;
-        notifyListeners();
-        return true;
-      }
       _isLoading = false;
+      _errorMessage = 'Error al comprobar verificación: $e';
       notifyListeners();
       return false;
     }
@@ -468,20 +368,23 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      if (_firebaseService.isInitialized && _firebaseService.hasRealCredentials && _firebaseService.auth != null) {
+      if (_firebaseService.auth != null) {
         await _firebaseService.auth!.sendPasswordResetEmail(email: email.trim());
         _successMessage = 'Hemos enviado un enlace de recuperación a $email.';
-      } else {
-        _successMessage = 'Enlace de restablecimiento enviado a $email.';
       }
       _isLoading = false;
       notifyListeners();
       return true;
-    } catch (e) {
-      _successMessage = 'Enlace de restablecimiento enviado a $email.';
+    } on FirebaseAuthException catch (e) {
       _isLoading = false;
+      _errorMessage = _getAuthErrorMessage(e.code);
       notifyListeners();
-      return true;
+      return false;
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = 'Error enviando enlace de recuperación: $e';
+      notifyListeners();
+      return false;
     }
   }
 
@@ -490,7 +393,7 @@ class AuthProvider extends ChangeNotifier {
     if (_currentUser == null) return false;
 
     if (!_currentUser!.canEditProfilePhoto) {
-      _errorMessage = 'Acción denegada: Las cuentas asociadas a proveedores como Google o GitHub utilizan el avatar de su respectiva plataforma.';
+      _errorMessage = 'Acción denegada: Las cuentas asociadas a Google o GitHub utilizan el avatar de su respectiva plataforma.';
       notifyListeners();
       return false;
     }
@@ -514,6 +417,7 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  // Actualizar membresía en el perfil tras suscripción
   void updateSubscriptionTier(String tier) {
     if (_currentUser != null) {
       _currentUser = _currentUser!.copyWith(subscriptionTier: tier);
@@ -522,10 +426,13 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  // --- CERRAR SESIÓN ---
   Future<void> signOut() async {
-    if (_firebaseService.isInitialized && _firebaseService.hasRealCredentials && _firebaseService.auth != null) {
+    if (_firebaseService.auth != null) {
       await _firebaseService.auth!.signOut();
-      await _googleSignIn.signOut();
+      try {
+        await _googleSignIn.signOut();
+      } catch (_) {}
     }
     _status = AuthStatus.unauthenticated;
     _currentUser = null;
@@ -537,15 +444,16 @@ class AuthProvider extends ChangeNotifier {
       case 'user-not-found':
         return 'No existe ninguna cuenta registrada con este correo.';
       case 'wrong-password':
-        return 'La contraseña introducida es incorrecta.';
+      case 'invalid-credential':
+        return 'La contraseña introducida es incorrecta o las credenciales no son válidas.';
       case 'email-already-in-use':
-        return 'Ya existe una cuenta con este correo electrónico.';
+        return 'Ya existe una cuenta registrada con este correo electrónico.';
       case 'invalid-email':
         return 'El formato del correo electrónico no es válido.';
       case 'weak-password':
         return 'La contraseña debe contener al menos 6 caracteres.';
       case 'user-disabled':
-        return 'Esta cuenta ha sido inhabilitada temporalmente.';
+        return 'Esta cuenta ha sido inhabilitada.';
       default:
         return 'Error de autenticación: $code';
     }

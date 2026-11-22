@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import '../../firebase_options.dart';
 import '../constants/app_constants.dart';
 import '../../models/user_model.dart';
 import '../../models/product_model.dart';
@@ -32,63 +33,171 @@ class FirebaseService {
   Future<void> initialize() async {
     try {
       if (Firebase.apps.isEmpty) {
-        try {
-          await Firebase.initializeApp();
-          _hasRealCredentials = true;
-          debugPrint('[FirebaseService] Firebase inicializado con credenciales reales.');
-        } catch (e) {
-          debugPrint('[FirebaseService] No se encontró google-services.json. Inicializando modo contingencia...');
-          await Firebase.initializeApp(
-            options: const FirebaseOptions(
-              apiKey: "AIzaSyFakeKey_FitPulseTesting1234567890",
-              appId: "1:123456789012:android:abcdef1234567890",
-              messagingSenderId: "123456789012",
-              projectId: "fitpulse-testing-app",
-              storageBucket: "fitpulse-testing-app.appspot.com",
-            ),
-          );
-          _hasRealCredentials = false;
-        }
+        await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform,
+        );
       }
       _auth = FirebaseAuth.instance;
       _firestore = FirebaseFirestore.instance;
       _storage = FirebaseStorage.instance;
       _isFirebaseInitialized = true;
+      _hasRealCredentials = true;
+      debugPrint('[FirebaseService] Firebase conectado con éxito a: fitpulse-app-f9977');
+
+      // Auto-sembrado de colecciones iniciales si Firestore está vacío
+      _seedInitialDataIfNeeded();
     } catch (e) {
-      debugPrint('[FirebaseService] Error general en Firebase: $e');
+      debugPrint('[FirebaseService] Error conectando con Firebase: $e');
       _isFirebaseInitialized = false;
       _hasRealCredentials = false;
     }
   }
 
+  /// Verifica y puebla automáticamente las colecciones de Firestore si aún no existen
+  Future<void> _seedInitialDataIfNeeded() async {
+    if (_firestore == null) return;
+    try {
+      // 1. Sedes de Gimnasio
+      final locSnapshot = await _firestore!.collection(AppConstants.colLocations).limit(1).get();
+      if (locSnapshot.docs.isEmpty) {
+        debugPrint('[FirebaseService] Sembrando sedes en Firestore...');
+        final samples = GymLocationModel.getSampleLocations();
+        for (final loc in samples) {
+          await _firestore!.collection(AppConstants.colLocations).doc(loc.id).set(loc.toMap());
+        }
+        debugPrint('[FirebaseService] Sedes sembradas en Firestore con éxito.');
+      }
+
+      // 2. Catálogo de Productos
+      final prodSnapshot = await _firestore!.collection(AppConstants.colProducts).limit(1).get();
+      if (prodSnapshot.docs.isEmpty) {
+        debugPrint('[FirebaseService] Sembrando catálogo de productos en Firestore...');
+        final sampleProducts = [
+          ProductModel(
+            id: 'prod_1',
+            name: 'Whey Isolate Protein 100% Ultra (2kg)',
+            description: 'Proteína aislada de suero de leche de rápida absorción con 27g de proteína y 5.5g de BCAAs por porción. Sabor Vainilla Francesa.',
+            price: 54.99,
+            category: 'Suplementos',
+            imageUrl: 'https://images.unsplash.com/photo-1579722821273-0f6c7d44362f?auto=format&fit=crop&w=600&q=80',
+            rating: 4.9,
+            stock: 35,
+            isFeatured: true,
+          ),
+          ProductModel(
+            id: 'prod_2',
+            name: 'Pre-Workout Explosive Energy (30 Serv)',
+            description: 'Fórmula pre-entreno con 300mg de cafeína anhidra, beta-alanina y citrulina malato para máxima vascularización y enfoque mental.',
+            price: 38.50,
+            category: 'Suplementos',
+            imageUrl: 'https://images.unsplash.com/photo-1593095948071-474c5cc2989d?auto=format&fit=crop&w=600&q=80',
+            rating: 4.8,
+            stock: 20,
+            isFeatured: true,
+          ),
+          ProductModel(
+            id: 'prod_3',
+            name: 'Cinturón de Halterofilia Cuero Genuino 10mm',
+            description: 'Soporte lumbar profesional para levantamiento de potencia (Powerlifting) y sentadillas pesadas con hebilla de acero inoxidable.',
+            price: 49.00,
+            category: 'Accesorios',
+            imageUrl: 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&w=600&q=80',
+            rating: 4.7,
+            stock: 15,
+          ),
+          ProductModel(
+            id: 'prod_4',
+            name: 'Polera Dry-Fit FitPulse Pro Athlete',
+            description: 'Camiseta técnica de compresión transpirable con tecnología anti-olor y corte ergonómico que maximiza la libertad de movimiento.',
+            price: 29.99,
+            category: 'Ropa Deportiva',
+            imageUrl: 'https://images.unsplash.com/photo-1581655353564-df123a1eb820?auto=format&fit=crop&w=600&q=80',
+            rating: 4.6,
+            stock: 50,
+          ),
+          ProductModel(
+            id: 'prod_5',
+            name: 'Set de Bandas de Resistencia Élite (5 Niveles)',
+            description: 'Bandas de látex natural premium de alta durabilidad con anclaje para puertas, agarraderas acolchadas y bolso de transporte.',
+            price: 24.99,
+            category: 'Equipamiento',
+            imageUrl: 'https://images.unsplash.com/photo-1598289431512-b97b0917affc?auto=format&fit=crop&w=600&q=80',
+            rating: 4.9,
+            stock: 40,
+          ),
+          ProductModel(
+            id: 'prod_6',
+            name: 'Creatina Monohidratada Creapure (500g)',
+            description: '100% monohidrato de creatina micronizada de pureza alemana. Aumenta la fuerza muscular explosiva y la masa magra.',
+            price: 32.00,
+            category: 'Suplementos',
+            imageUrl: 'https://images.unsplash.com/photo-1584017911766-d451b3d0e843?auto=format&fit=crop&w=600&q=80',
+            rating: 5.0,
+            stock: 60,
+            isFeatured: true,
+          ),
+          ProductModel(
+            id: 'prod_7',
+            name: 'BCAA 2:1:1 Recovery Complex (400g)',
+            description: 'Aminoácidos de cadena ramificada en proporción óptima para recuperación muscular post-entrenamiento. Sabor Sandía.',
+            price: 27.99,
+            category: 'Suplementos',
+            imageUrl: 'https://images.unsplash.com/photo-1543362906-acfc16c67564?auto=format&fit=crop&w=600&q=80',
+            rating: 4.7,
+            stock: 45,
+            isFeatured: false,
+          ),
+          ProductModel(
+            id: 'prod_8',
+            name: 'Mancuernas Ajustables Premium 5-25kg',
+            description: 'Sistema de mancuernas ajustables de hierro fundido que reemplaza 9 pares tradicionales. Mecanismo de selección de peso rápido.',
+            price: 149.99,
+            category: 'Equipamiento',
+            imageUrl: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=600&q=80',
+            rating: 4.9,
+            stock: 10,
+            isFeatured: true,
+          ),
+        ];
+
+        for (final p in sampleProducts) {
+          await _firestore!.collection(AppConstants.colProducts).doc(p.id).set(p.toMap());
+        }
+        debugPrint('[FirebaseService] Catálogo de productos sembrado en Firestore con éxito.');
+      }
+    } catch (e) {
+      debugPrint('[FirebaseService] Aviso al inicializar datos en Firestore: $e');
+    }
+  }
+
   // --- MÉTODOS DE USUARIO Y PERFIL ---
   Future<void> saveUserProfile(UserModel user) async {
-    if (!_isFirebaseInitialized || !_hasRealCredentials || _firestore == null) return;
+    if (_firestore == null) return;
     try {
       await _firestore!.collection(AppConstants.colUsers).doc(user.uid).set(
         user.toMap(),
         SetOptions(merge: true),
       );
     } catch (e) {
-      debugPrint('[FirebaseService] Error saving user profile: $e');
+      debugPrint('[FirebaseService] Error guardando perfil: $e');
     }
   }
 
   Future<UserModel?> getUserProfile(String uid) async {
-    if (!_isFirebaseInitialized || !_hasRealCredentials || _firestore == null) return null;
+    if (_firestore == null) return null;
     try {
       final doc = await _firestore!.collection(AppConstants.colUsers).doc(uid).get();
       if (doc.exists && doc.data() != null) {
         return UserModel.fromMap(doc.data()!);
       }
     } catch (e) {
-      debugPrint('[FirebaseService] Error getting user profile: $e');
+      debugPrint('[FirebaseService] Error obteniendo perfil: $e');
     }
     return null;
   }
 
   Stream<UserModel?> streamUserProfile(String uid) {
-    if (!_isFirebaseInitialized || !_hasRealCredentials || _firestore == null) return const Stream.empty();
+    if (_firestore == null) return const Stream.empty();
     return _firestore!.collection(AppConstants.colUsers).doc(uid).snapshots().map((doc) {
       if (doc.exists && doc.data() != null) {
         return UserModel.fromMap(doc.data()!);
@@ -99,7 +208,7 @@ class FirebaseService {
 
   // --- FIREBASE STORAGE: SUBIDA DE FOTO DE PERFIL ---
   Future<String> uploadProfileImage(String uid, File imageFile) async {
-    if (!_isFirebaseInitialized || !_hasRealCredentials || _storage == null) {
+    if (_storage == null) {
       return 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80';
     }
 
@@ -118,45 +227,22 @@ class FirebaseService {
 
       return downloadUrl;
     } catch (e) {
-      debugPrint('[FirebaseService] Error uploading profile image: $e');
+      debugPrint('[FirebaseService] Error subiendo foto a Storage: $e');
       return 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80';
     }
   }
 
   // --- FIRESTORE: PRODUCTOS EN TIEMPO REAL ---
   Stream<List<ProductModel>> streamProducts() {
-    if (!_isFirebaseInitialized || !_hasRealCredentials || _firestore == null) return const Stream.empty();
+    if (_firestore == null) return const Stream.empty();
     return _firestore!.collection(AppConstants.colProducts).snapshots().map((snapshot) {
       return snapshot.docs.map((doc) => ProductModel.fromMap(doc.data(), doc.id)).toList();
     });
   }
 
-  // --- FIRESTORE: ÓRDENES Y TRANSACCIONES ---
-  Future<void> saveOrder(OrderModel order) async {
-    if (!_isFirebaseInitialized || !_hasRealCredentials || _firestore == null) return;
-    try {
-      await _firestore!.collection(AppConstants.colOrders).doc(order.id).set(order.toMap());
-    } catch (e) {
-      debugPrint('[FirebaseService] Error saving order: $e');
-    }
-  }
-
-  Stream<List<OrderModel>> streamUserOrders(String userId) {
-    if (!_isFirebaseInitialized || !_hasRealCredentials || _firestore == null) return const Stream.empty();
-    return _firestore!
-        .collection(AppConstants.colOrders)
-        .where('userId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snapshot) =>
-            snapshot.docs.map((doc) => OrderModel.fromMap(doc.data(), doc.id)).toList());
-  }
-
   // --- FIRESTORE: LOCACIONES DE GIMNASIO EN TIEMPO REAL ---
   Stream<List<GymLocationModel>> streamGymLocations() {
-    if (!_isFirebaseInitialized || !_hasRealCredentials || _firestore == null) {
-      return const Stream.empty();
-    }
+    if (_firestore == null) return const Stream.empty();
     return _firestore!.collection(AppConstants.colLocations).snapshots().map((snapshot) {
       return snapshot.docs
           .map((doc) => GymLocationModel.fromMap(doc.data(), doc.id))
@@ -166,7 +252,7 @@ class FirebaseService {
 
   // --- FIRESTORE: GUARDAR PRODUCTO (ADMIN) ---
   Future<void> saveProduct(ProductModel product) async {
-    if (!_isFirebaseInitialized || !_hasRealCredentials || _firestore == null) return;
+    if (_firestore == null) return;
     try {
       if (product.id.isEmpty) {
         await _firestore!.collection(AppConstants.colProducts).add(product.toMap());
@@ -174,19 +260,41 @@ class FirebaseService {
         await _firestore!.collection(AppConstants.colProducts).doc(product.id).set(product.toMap());
       }
     } catch (e) {
-      debugPrint('[FirebaseService] Error saving product: $e');
+      debugPrint('[FirebaseService] Error guardando producto: $e');
       rethrow;
     }
   }
 
   // --- FIRESTORE: ELIMINAR PRODUCTO (ADMIN) ---
   Future<void> deleteProduct(String productId) async {
-    if (!_isFirebaseInitialized || !_hasRealCredentials || _firestore == null) return;
+    if (_firestore == null) return;
     try {
       await _firestore!.collection(AppConstants.colProducts).doc(productId).delete();
     } catch (e) {
-      debugPrint('[FirebaseService] Error deleting product: $e');
+      debugPrint('[FirebaseService] Error eliminando producto: $e');
       rethrow;
     }
+  }
+
+  // --- FIRESTORE: ÓRDENES Y TRANSACCIONES REALES ---
+  Future<void> saveOrder(OrderModel order) async {
+    if (_firestore == null) return;
+    try {
+      await _firestore!.collection(AppConstants.colOrders).doc(order.id).set(order.toMap());
+    } catch (e) {
+      debugPrint('[FirebaseService] Error guardando orden en Firestore: $e');
+      rethrow;
+    }
+  }
+
+  Stream<List<OrderModel>> streamUserOrders(String userId) {
+    if (_firestore == null) return const Stream.empty();
+    return _firestore!
+        .collection(AppConstants.colOrders)
+        .where('userId', isEqualTo: userId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => OrderModel.fromMap(doc.data(), doc.id)).toList());
   }
 }
