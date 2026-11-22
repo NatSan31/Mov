@@ -10,7 +10,6 @@ import '../../widgets/cached_network_image_wrapper.dart';
 import '../../widgets/ui_innovation/fitness_pulse_radar.dart';
 import '../../widgets/ui_innovation/glass_membership_card.dart';
 import '../notifications/notification_topics_screen.dart';
-import '../../core/services/firebase_service.dart';
 import '../admin/add_product_screen.dart';
 
 class HomeDashboardScreen extends StatelessWidget {
@@ -19,7 +18,6 @@ class HomeDashboardScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
-    final sensorProvider = context.watch<SensorProvider>();
     final productsProvider = context.watch<ProductsProvider>();
     final user = authProvider.currentUser;
 
@@ -33,29 +31,29 @@ class HomeDashboardScreen extends StatelessWidget {
           },
           child: Row(
             children: [
-              // Sincronización dinámica de la foto de perfil en el dashboard
+              // Sincronización dinámica de la foto de perfil sin parpadeos
               CachedImageWrapper(
-              imageUrl: user?.photoUrl ?? '',
-              width: 38,
-              height: 38,
-              borderRadius: BorderRadius.circular(19),
-            ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'HOLA DE NUEVO',
-                  style: TextStyle(fontSize: 10, color: Colors.grey, letterSpacing: 1),
-                ),
-                Text(
-                  user?.displayName ?? 'Atleta FitPulse',
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-          ],
-        ),
+                imageUrl: user?.photoUrl ?? '',
+                width: 38,
+                height: 38,
+                borderRadius: BorderRadius.circular(19),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'HOLA DE NUEVO',
+                    style: TextStyle(fontSize: 10, color: Colors.grey, letterSpacing: 1),
+                  ),
+                  Text(
+                    user?.displayName ?? 'Atleta FitPulse',
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
         actions: [
           // Botón de Canales / Notificaciones FCM
@@ -68,7 +66,7 @@ class HomeDashboardScreen extends StatelessWidget {
               );
             },
           ),
-          // Botón para simular Push Notification inmediata (para demostración de evaluación)
+          // Botón para simular Push Notification inmediata
           IconButton(
             icon: const Icon(Icons.send_to_mobile, color: AppColors.secondary),
             tooltip: 'Simular Notificación Push (FCM)',
@@ -91,7 +89,7 @@ class HomeDashboardScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. Tarjeta Glassmorphic de Membresía del Usuario
+              // 1. Tarjeta Glassmorphic de Membresía del Usuario (Con QR de acceso interactivo)
               if (user != null)
                 GlassMembershipCard(user: user)
               else
@@ -106,10 +104,14 @@ class HomeDashboardScreen extends StatelessWidget {
 
               const SizedBox(height: 20),
 
-              // 2. Widget Avanzado Innovador: Radar Biométrico y Acelerómetro en Vivo
-              FitnessPulseRadar(
-                intensity: sensorProvider.motionIntensity,
-                steps: sensorProvider.stepsSimulated,
+              // 2. Widget de Telemetría Biometría Aislado con Consumer (Sin afectar al AppBar ni fotos)
+              Consumer<SensorProvider>(
+                builder: (context, sensor, _) {
+                  return FitnessPulseRadar(
+                    intensity: sensor.motionIntensity,
+                    steps: sensor.stepsSimulated,
+                  );
+                },
               ),
 
               const SizedBox(height: 24),

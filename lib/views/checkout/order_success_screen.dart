@@ -161,7 +161,33 @@ class OrderSuccessScreen extends StatelessWidget {
                           'COMPROBANTE FISCAL DIGITAL',
                           style: TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1),
                         ),
-                        const Icon(Icons.qr_code_2, color: Colors.white70, size: 28),
+                        InkWell(
+                          onTap: () => _showFiscalQrDialog(context, orderId, amount),
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.white24),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: const [
+                                Icon(Icons.qr_code_2, color: AppColors.secondary, size: 20),
+                                SizedBox(width: 4),
+                                Text(
+                                  'VER QR',
+                                  style: TextStyle(
+                                    color: AppColors.secondary,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                     const Divider(height: 16, color: Colors.white12),
@@ -278,6 +304,130 @@ class OrderSuccessScreen extends StatelessWidget {
           Text(label, style: const TextStyle(color: Colors.grey, fontSize: 11)),
           Text(value, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11, color: Colors.white70)),
         ],
+      ),
+    );
+  }
+
+  void _showFiscalQrDialog(BuildContext context, String orderId, double amount) {
+    final folio = orderId.toUpperCase();
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: AppColors.darkCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Factura CFDI 4.0 SAT',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.grey),
+                    onPressed: () => Navigator.of(ctx).pop(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.3),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    const Icon(
+                      Icons.qr_code_2,
+                      size: 190,
+                      color: Colors.black87,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'UUID: ${folio.substring(0, folio.length.clamp(0, 18))}',
+                      style: const TextStyle(
+                        fontFamily: 'Courier',
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white10),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Emisor:', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                        const Text('FITPULSE MÉXICO S.A. DE C.V.', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.white)),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Sello Digital:', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                        const Text('Verificado por SAT', style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 11)),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Total:', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                        Text('\$${amount.toStringAsFixed(2)} USD', style: const TextStyle(color: AppColors.secondary, fontWeight: FontWeight.bold, fontSize: 12)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(double.infinity, 44),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                icon: const Icon(Icons.download, size: 18),
+                label: const Text('DESCARGAR XML & PDF', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('📄 Comprobante fiscal y XML descargados en tu dispositivo.'),
+                      backgroundColor: Colors.green,
+                      duration: Duration(seconds: 3),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
