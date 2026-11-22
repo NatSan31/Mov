@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>FitPulse</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>fitpulse_app</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(FLUTTER_BUILD_NAME)</string>
+	<key>CFBundleSignature</key>
+	<string>????</string>
+	<key>CFBundleVersion</key>
+	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+	<key>UIMainStoryboardFile</key>
+	<string>Main</string>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<false/>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
+
+	<!-- Permisos Nativos Requeridos por el Proyecto -->
+	<key>NSFaceIDUsageDescription</key>
+	<string>FitPulse requiere acceso a Face ID / Biometría para autenticación segura y confirmación de pedidos.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>FitPulse requiere tu ubicación para mostrarte los clubes y gimnasios más cercanos en el mapa.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>FitPulse requiere tu ubicación para geolocalizar sedes deportivas.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>FitPulse necesita acceso a tu galería para cambiar tu foto de perfil.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>FitPulse necesita acceso a tu cámara para capturar tu nueva foto de perfil.</string>
+</dict>
+</plist>

@@ -1,0 +1,113 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../core/constants/app_colors.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/onboarding_provider.dart';
+import '../onboarding/onboarding_screen.dart';
+import '../auth/login_screen.dart';
+import '../auth/email_verification_screen.dart';
+import '../dashboard/main_navigation_screen.dart';
+
+class SplashScreen extends StatelessWidget {
+  const SplashScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    // Escuchar el estado de autenticación y onboarding de manera segura
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        final onboardingProvider = context.read<OnboardingProvider>();
+        await onboardingProvider.checkOnboardingStatus();
+
+        await Future.delayed(const Duration(milliseconds: 1500));
+
+        if (!context.mounted) return;
+
+        if (!onboardingProvider.isCompleted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+          );
+          return;
+        }
+
+        final authProvider = context.read<AuthProvider>();
+        if (authProvider.status == AuthStatus.authenticated) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
+          );
+        } else if (authProvider.status == AuthStatus.unverifiedEmail) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const EmailVerificationScreen()),
+          );
+        } else {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const LoginScreen()),
+          );
+        }
+      } catch (e) {
+        debugPrint('[SplashScreen] Error durante navegación: $e');
+        if (context.mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const LoginScreen()),
+          );
+        }
+      }
+    });
+
+    return Scaffold(
+      backgroundColor: AppColors.darkBackground,
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.12),
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.primary, width: 2),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withOpacity(0.4),
+                    blurRadius: 30,
+                    spreadRadius: 4,
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.bolt, size: 72, color: AppColors.primary),
+            ),
+            const SizedBox(height: 28),
+            const Text(
+              'FITPULSE',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 34,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 4,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'CLUB & PRO SHOP',
+              style: TextStyle(
+                color: AppColors.secondary,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 3,
+              ),
+            ),
+            const SizedBox(height: 48),
+            const SizedBox(
+              width: 28,
+              height: 28,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                color: AppColors.primary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
