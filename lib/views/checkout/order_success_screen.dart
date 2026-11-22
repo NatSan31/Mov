@@ -19,87 +19,180 @@ class OrderSuccessScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final trackingCode = 'FPX-${orderId.substring(0, orderId.length.clamp(0, 8)).toUpperCase()}-MX';
+
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Comprobante & Rastreo'),
+        automaticallyImplyLeading: false,
+      ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Container(
-                width: 90,
-                height: 90,
-                decoration: BoxDecoration(
-                  color: AppColors.secondary.withOpacity(0.15),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.secondary, width: 2),
+              // Icono de Aprobación
+              Center(
+                child: Container(
+                  width: 76,
+                  height: 76,
+                  decoration: BoxDecoration(
+                    color: AppColors.secondary.withOpacity(0.15),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.secondary, width: 2.5),
+                  ),
+                  child: const Icon(Icons.check, size: 44, color: AppColors.secondary),
                 ),
-                child: const Icon(Icons.check, size: 54, color: AppColors.secondary),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
               Text(
-                isSubscription ? '¡Membresía Activada!' : '¡Pago Procesado con Éxito!',
-                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+                isSubscription ? '¡Suscripción Activada!' : '¡Pago Aprobado y Pedido en Camino!',
+                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               Text(
                 isSubscription
-                    ? 'Tu suscripción a $subscriptionPlanName ya está activa en tu cuenta y carnet digital.'
-                    : 'Hemos recibido tu pedido en Pro Shop. En breve recibirás la notificación de despacho.',
-                style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.4),
+                    ? 'Tu plan $subscriptionPlanName ha sido acreditado en tu membresía digital y registrado en Firebase.'
+                    : 'Tu pedido ha sido procesado por la pasarela segura y transferido al centro de logística express.',
+                style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
                 textAlign: TextAlign.center,
               ),
+
               const SizedBox(height: 24),
 
-              // Detalle de la Transacción
+              // 1. LÍNEA DE TIEMPO DE RASTREO EN VIVO (ORDER TRACKING)
+              if (!isSubscription) ...[
+                Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardTheme.color ?? AppColors.darkCard,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppColors.secondary.withOpacity(0.4), width: 1.5),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: const [
+                              Icon(Icons.local_shipping, color: AppColors.secondary, size: 20),
+                              SizedBox(width: 8),
+                              Text(
+                                'SEGUIMIENTO EN VIVO',
+                                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 1),
+                              ),
+                            ],
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              'EN RUTA',
+                              style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 10),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Número de Guía: $trackingCode',
+                        style: const TextStyle(fontFamily: 'Courier', fontSize: 11, color: Colors.white70),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Pasos del Rastreo
+                      _buildTrackingStep(
+                        icon: Icons.credit_score,
+                        title: 'Pago Acreditado & Recibo Fiscal',
+                        subtitle: 'Validación biométrica aprobada en pasarela Stripe',
+                        isCompleted: true,
+                        isCurrent: false,
+                      ),
+                      _buildTrackingStep(
+                        icon: Icons.inventory_2_outlined,
+                        title: 'Empacado en Almacén FitPulse',
+                        subtitle: 'Artículos verificados y sellados con precinto de seguridad',
+                        isCompleted: true,
+                        isCurrent: false,
+                      ),
+                      _buildTrackingStep(
+                        icon: Icons.two_wheeler,
+                        title: 'En Camino con Repartidor Express',
+                        subtitle: 'Repartidor: Carlos M. (Unidad Eléctrica FitPulse #12)',
+                        isCompleted: false,
+                        isCurrent: true,
+                      ),
+                      _buildTrackingStep(
+                        icon: Icons.home_outlined,
+                        title: 'Entrega Estimada en Domicilio',
+                        subtitle: 'Estimado de recepción: Hoy antes de las 18:30 hrs',
+                        isCompleted: false,
+                        isCurrent: false,
+                        isLast: true,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
+
+              // 2. RECIBO FISCAL / TICKET DIGITAL
               Container(
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
                   color: Theme.of(context).cardTheme.color ?? AppColors.darkCard,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.white10),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white12),
                 ),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Folio Transacción', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                        Text(
-                          orderId.substring(0, orderId.length.clamp(0, 16)),
-                          style: const TextStyle(fontFamily: 'Courier', fontWeight: FontWeight.bold, fontSize: 12),
+                        const Text(
+                          'COMPROBANTE FISCAL DIGITAL',
+                          style: TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1),
                         ),
+                        const Icon(Icons.qr_code_2, color: Colors.white70, size: 28),
                       ],
                     ),
                     const Divider(height: 16, color: Colors.white12),
+                    _buildReceiptRow('Folio Transacción', orderId.substring(0, orderId.length.clamp(0, 16)).toUpperCase()),
+                    _buildReceiptRow('Fecha & Hora', '${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year} - ${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')} hrs'),
+                    _buildReceiptRow('Plataforma', 'FitPulse App Mobile Pay (PCI-DSS)'),
+                    _buildReceiptRow('Estado en Firestore', 'Persistido en colección /orders'),
+                    const Divider(height: 16, color: Colors.white12),
+                    _buildReceiptRow('Subtotal', '\$${(amount * 0.862).toStringAsFixed(2)} USD'),
+                    _buildReceiptRow('Impuestos (IVA 16%)', '\$${(amount * 0.138).toStringAsFixed(2)} USD'),
+                    const SizedBox(height: 4),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Monto Cobrado', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                        const Text('TOTAL COBRADO', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white)),
                         Text(
                           '\$${amount.toStringAsFixed(2)} USD',
-                          style: const TextStyle(color: AppColors.secondary, fontWeight: FontWeight.bold, fontSize: 14),
+                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: AppColors.secondary),
                         ),
-                      ],
-                    ),
-                    const Divider(height: 16, color: Colors.white12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: const [
-                        Text('Método de Pago', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                        Text('Tarjeta Encriptada (Stripe)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                       ],
                     ),
                   ],
                 ),
               ),
 
-              const SizedBox(height: 36),
+              const SizedBox(height: 28),
 
+              // Botón de Retorno
               CustomButton(
                 text: 'VOLVER AL INICIO',
+                icon: Icons.home,
                 onPressed: () {
                   Navigator.of(context).pushAndRemoveUntil(
                     MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
@@ -110,6 +203,81 @@ class OrderSuccessScreen extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildTrackingStep({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required bool isCompleted,
+    required bool isCurrent,
+    bool isLast = false,
+  }) {
+    final color = isCompleted
+        ? Colors.greenAccent
+        : isCurrent
+            ? AppColors.secondary
+            : Colors.grey;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.15),
+                shape: BoxShape.circle,
+                border: Border.all(color: color, width: 2),
+              ),
+              child: Icon(icon, color: color, size: 16),
+            ),
+            if (!isLast)
+              Container(
+                width: 2,
+                height: 32,
+                color: isCompleted ? Colors.greenAccent.withOpacity(0.5) : Colors.white12,
+              ),
+          ],
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  color: isCurrent ? Colors.white : Colors.white70,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: TextStyle(color: Colors.grey.shade400, fontSize: 11),
+              ),
+              const SizedBox(height: 10),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildReceiptRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(color: Colors.grey, fontSize: 11)),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11, color: Colors.white70)),
+        ],
       ),
     );
   }

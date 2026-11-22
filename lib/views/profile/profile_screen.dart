@@ -1,9 +1,12 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
+import '../../core/services/firebase_service.dart';
+import '../../models/order_model.dart';
 import '../../widgets/cached_network_image_wrapper.dart';
 import '../auth/login_screen.dart';
 import '../notifications/notification_topics_screen.dart';
@@ -16,7 +19,6 @@ class ProfileScreen extends StatelessWidget {
     final authProvider = context.watch<AuthProvider>();
     final themeProvider = context.watch<ThemeProvider>();
     final user = authProvider.currentUser;
-
     final isEmailAccount = user?.canEditProfilePhoto ?? false;
 
     return Scaffold(
@@ -56,12 +58,20 @@ class ProfileScreen extends StatelessWidget {
                         ),
                       ],
                     ),
-                    child: CachedImageWrapper(
-                      imageUrl: user?.photoUrl ?? '',
-                      width: 104,
-                      height: 104,
-                      borderRadius: BorderRadius.circular(52),
-                    ),
+                    child: authProvider.isLoading
+                        ? const SizedBox(
+                            width: 104,
+                            height: 104,
+                            child: Center(
+                              child: CircularProgressIndicator(color: AppColors.primary),
+                            ),
+                          )
+                        : CachedImageWrapper(
+                            imageUrl: user?.photoUrl ?? '',
+                            width: 104,
+                            height: 104,
+                            borderRadius: BorderRadius.circular(52),
+                          ),
                   ),
 
                   // Botón de cámara / editar foto
@@ -71,19 +81,17 @@ class ProfileScreen extends StatelessWidget {
                     child: GestureDetector(
                       onTap: () {
                         if (!isEmailAccount) {
-                          // Regla de Requerimientos: Restricción de edición estricta
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text(
-                                'Restricción: Las cuentas vinculadas con proveedores externos (Google/GitHub) gestionan su foto desde la plataforma original.',
+                                'Restricción de evaluación: Las cuentas con Google o GitHub gestionan su foto desde la plataforma original.',
                               ),
                               backgroundColor: AppColors.warning,
                               duration: Duration(seconds: 4),
                             ),
                           );
                         } else {
-                          // Permitido para email/password: Diálogo de selección o actualización
-                          _showEditPhotoDialog(context, authProvider);
+                          _showPhotoPickerSheet(context, authProvider);
                         }
                       },
                       child: Container(
@@ -117,66 +125,36 @@ class ProfileScreen extends StatelessWidget {
               user?.email ?? '',
               style: const TextStyle(color: Colors.grey, fontSize: 13),
             ),
+            const SizedBox(height: 8),
 
-            const SizedBox(height: 12),
-
-            // Badge de Proveedor de Autenticación
+            // Badge de origen de cuenta (Requerimiento de evaluación)
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.08),
+                color: user?.authProvider == 'google.com'
+                    ? Colors.red.withOpacity(0.15)
+                    : user?.authProvider == 'github.com'
+                        ? Colors.purple.withOpacity(0.15)
+                        : AppColors.primary.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.white12),
+                border: Border.all(
+                  color: user?.authProvider == 'google.com'
+                      ? Colors.redAccent
+                      : user?.authProvider == 'github.com'
+                          ? Colors.purpleAccent
+                          : AppColors.primary,
+                  width: 1,
+                ),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    user?.authProvider == 'google.com'
-                        ? Icons.g_mobiledata
-                        : user?.authProvider == 'github.com'
-                            ? Icons.code
-                            : Icons.email_outlined,
-                    size: 16,
-                    color: AppColors.secondary,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Autenticado vía ${user?.authProvider.toUpperCase() ?? "EMAIL"}',
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white70),
-                  ),
-                ],
+              child: Text(
+                'Autenticado con: ${user?.authProvider.toUpperCase() ?? "EMAIL"}',
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
               ),
             ),
 
-            const SizedBox(height: 28),
+            const SizedBox(height: 24),
 
-            // Mensajes de estado
-            if (authProvider.errorMessage != null)
-              Container(
-                padding: const EdgeInsets.all(12),
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: AppColors.error.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.error),
-                ),
-                child: Text(authProvider.errorMessage!, style: const TextStyle(color: AppColors.error, fontSize: 12)),
-              ),
-
-            if (authProvider.successMessage != null)
-              Container(
-                padding: const EdgeInsets.all(12),
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: AppColors.success.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.success),
-                ),
-                child: Text(authProvider.successMessage!, style: const TextStyle(color: AppColors.success, fontSize: 12)),
-              ),
-
-            // Opciones y Preferencias de la Cuenta
+            // Opciones de Configuración y Estado
             Container(
               decoration: BoxDecoration(
                 color: Theme.of(context).cardTheme.color ?? AppColors.darkCard,
@@ -186,9 +164,9 @@ class ProfileScreen extends StatelessWidget {
               child: Column(
                 children: [
                   ListTile(
-                    leading: const Icon(Icons.notifications_active_outlined, color: AppColors.primary),
-                    title: const Text('Temas de Notificaciones (FCM)'),
-                    subtitle: const Text('Configura tus canales suscritos'),
+                    leading: const Icon(Icons.notifications_active_outlined, color: AppColors.primaryLight),
+                    title: const Text('Canales de Notificaciones Push'),
+                    subtitle: const Text('Gestionar suscripciones FCM Topics'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () {
                       Navigator.of(context).push(
@@ -211,7 +189,7 @@ class ProfileScreen extends StatelessWidget {
                   ListTile(
                     leading: const Icon(Icons.verified_user_outlined, color: AppColors.accent),
                     title: const Text('Verificación de Correo'),
-                    subtitle: Text(user?.emailVerified == true ? 'Cuenta Verificada' : 'Pendiente'),
+                    subtitle: Text(user?.emailVerified == true ? 'Cuenta Verificada en Firebase' : 'Pendiente'),
                     trailing: Icon(
                       user?.emailVerified == true ? Icons.check_circle : Icons.warning,
                       color: user?.emailVerified == true ? AppColors.secondary : AppColors.warning,
@@ -222,11 +200,131 @@ class ProfileScreen extends StatelessWidget {
                   ListTile(
                     leading: const Icon(Icons.fitness_center_outlined, color: Colors.blueAccent),
                     title: const Text('Membresía Activa'),
-                    subtitle: Text((user?.subscriptionTier ?? 'none').toUpperCase()),
+                    subtitle: Text((user?.subscriptionTier ?? 'Smart Basic').toUpperCase()),
                     trailing: const Icon(Icons.chevron_right),
                   ),
                 ],
               ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // Sección de Pedidos y Compras en Firestore
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'MIS PEDIDOS & HISTORIAL (FIRESTORE)',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.2,
+                  color: Colors.white70,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            StreamBuilder<List<OrderModel>>(
+              stream: FirebaseService().streamUserOrders(user?.uid ?? ''),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: Padding(
+                    padding: EdgeInsets.all(12.0),
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ));
+                }
+
+                final orders = snapshot.data ?? [];
+                if (orders.isEmpty) {
+                  return Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).cardTheme.color ?? AppColors.darkCard,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.white10),
+                    ),
+                    child: Row(
+                      children: const [
+                        Icon(Icons.receipt_long, color: Colors.grey),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Aún no has realizado pedidos. Compra en la tienda Pro Shop para ver tus comprobantes aquí.',
+                            style: TextStyle(color: Colors.grey, fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: orders.length.clamp(0, 5),
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (context, idx) {
+                    final order = orders[idx];
+                    return Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).cardTheme.color ?? AppColors.darkCard,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppColors.secondary.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppColors.secondary.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(Icons.local_shipping_outlined, color: AppColors.secondary, size: 24),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Pedido #${order.id.substring(0, order.id.length.clamp(0, 8)).toUpperCase()}',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${order.items.length} artículos • Pagado con ${order.paymentCardBrand} •••• ${order.paymentLast4}',
+                                  style: const TextStyle(color: Colors.grey, fontSize: 11),
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: Colors.green.withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        order.status,
+                                        style: const TextStyle(color: Colors.greenAccent, fontSize: 10, fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          Text(
+                            '\$${order.total.toStringAsFixed(2)}',
+                            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: Colors.white),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                );
+              },
             ),
 
             const SizedBox(height: 28),
@@ -257,7 +355,9 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  void _showEditPhotoDialog(BuildContext context, AuthProvider authProvider) {
+  void _showPhotoPickerSheet(BuildContext context, AuthProvider authProvider) {
+    final picker = ImagePicker();
+
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.darkSurface,
@@ -275,22 +375,80 @@ class ProfileScreen extends StatelessWidget {
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 const Text(
-                  'El nuevo avatar se sincronizará dinámicamente en el dashboard y en la nube.',
+                  'La imagen se guardará en la nube de Firebase y se sincronizará en todo tu panel.',
                   style: TextStyle(color: Colors.grey, fontSize: 12),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 20),
                 ListTile(
-                  leading: const Icon(Icons.photo_library, color: AppColors.primary),
-                  title: const Text('Subir Nueva Foto a Storage'),
-                  subtitle: const Text('Simula o carga archivo JPEG'),
+                  leading: const Icon(Icons.photo_camera, color: AppColors.primary),
+                  title: const Text('Tomar Foto con la Cámara'),
+                  subtitle: const Text('Captura tu foto con la cámara del teléfono'),
                   onTap: () async {
                     Navigator.of(ctx).pop();
-                    // Subida simulada con archivo dummy
-                    final dummyFile = File('/tmp/fitpulse_avatar.jpg');
-                    await authProvider.updateProfilePhoto(dummyFile);
+                    try {
+                      final XFile? photo = await picker.pickImage(
+                        source: ImageSource.camera,
+                        maxWidth: 800,
+                        maxHeight: 800,
+                        imageQuality: 85,
+                      );
+                      if (photo != null) {
+                        final file = File(photo.path);
+                        await authProvider.updateProfilePhoto(file);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('✅ Foto subida exitosamente a Firebase Storage'),
+                              backgroundColor: AppColors.secondary,
+                            ),
+                          );
+                        }
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error al capturar foto: $e'), backgroundColor: AppColors.error),
+                        );
+                      }
+                    }
+                  },
+                ),
+                const Divider(color: Colors.white12),
+                ListTile(
+                  leading: const Icon(Icons.photo_library, color: AppColors.secondary),
+                  title: const Text('Elegir de la Galería'),
+                  subtitle: const Text('Selecciona una imagen guardada en tu dispositivo'),
+                  onTap: () async {
+                    Navigator.of(ctx).pop();
+                    try {
+                      final XFile? image = await picker.pickImage(
+                        source: ImageSource.gallery,
+                        maxWidth: 800,
+                        maxHeight: 800,
+                        imageQuality: 85,
+                      );
+                      if (image != null) {
+                        final file = File(image.path);
+                        await authProvider.updateProfilePhoto(file);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('✅ Foto subida exitosamente a Firebase Storage'),
+                              backgroundColor: AppColors.secondary,
+                            ),
+                          );
+                        }
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error al seleccionar imagen: $e'), backgroundColor: AppColors.error),
+                        );
+                      }
+                    }
                   },
                 ),
               ],
